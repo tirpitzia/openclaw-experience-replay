@@ -1,0 +1,28 @@
+{
+  "name": "experience-replay",
+  "version": "0.1.0",
+  "description": "OpenClaw plugin for contextual experience replay and self-improvement.",
+  "type": "module",
+  "keywords": ["openclaw-plugin", "openclaw", "experience-replay", "agent-memory"],
+  "license": "MIT",
+  "files": ["src", "examples", "openclaw.plugin.json", "README.md", "README_ZH.md", "LICENSE"],
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "openclaw": {
+    "extensions": ["./src/index.ts"]
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.3.13"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "openclaw": "2026.3.13",
+    "typescript": "^5.8.2",
+    "vitest": "^3.2.4"
+  }
+}

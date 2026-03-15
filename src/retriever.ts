@@ -1,0 +1,92 @@
+import type { Embedder, ExperienceReplayConfig, PluginLogger, RetrievedExperience, StoredExperience } from "./types.js";
+
+const normalize = (value: string): string => value.toLowerCase().replace(/\s+/g, " ").trim();
+
+const slidingPairs = (value: string): string[] =>
+  value.length < 2 ? (value ? [value] : []) : Array.from({ length: value.length - 1 }, (_, index) => value.slice(index, index + 2));
+
+const tokenize = (value: string): string[] => {
+  const normalized = normalize(value);
+  const words = normalized.match(/[\p{L}\p{N}_-]+/gu) ?? [];
+  const compact = normalized.replace(/\s+/g, "");
+  return [...words, ...slidingPairs(compact)];
+};
+
+const zeroVector = (size: number): number[] => Array.from({ length: size }, () => 0);
+
+const unitize = (vector: number[]): number[] => {
+  const length = Math.sqrt(vector.reduce((sum, value) => sum + value ** 2, 0));
+  return length === 0 ? vector : vector.map((value) => value / length);
+};
+
+const hashToken = (token: string, size: number): number =>
+  Array.from(token).reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) % size, 7);
+
+export const lexicalEmbedding = (text: string, size = 128): number[] => {
+  const buckets = tokenize(text).reduce<Record<number, number>>(
+    (acc, token) => ({ ...acc, [hashToken(token, size)]: (acc[hashToken(token, size)] ?? 0) + 1 }),
+    {},
+  );
+  return unitize(Array.from({ length: size }, (_, index) => buckets[index] ?? 0));
+};
+
+export const cosineSimilarity = (left: number[], right: number[]): number =>
+  left.length === right.length
+    ? left.reduce((sum, value, index) => sum + value * (right[index] ?? 0), 0)
+    : 0;
+
+const openAiEmbedding = async (input: {
+  text: string;
+  apiKey: string;
+  model: string;
+  baseUrl: string;
+}): Promise<number[]> => {
+  const response = await fetch(`${input.baseUrl}/embeddings`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${input.apiKey}`,
+    },
+    body: JSON.stringify({ model: input.model, input: input.text }),
+  });
+  const payload = (await response.json()) as { data?: Array<{ embedding?: number[] }>; error?: { message?: string } };
+  if (!response.ok) throw new Error(payload.error?.message ?? `embedding request failed: ${response.status}`);
+  return payload.data?.[0]?.embedding ?? zeroVector(128);
+};
+
+export const createEmbedder = (config: ExperienceReplayConfig, logger: PluginLogger) => async (text: string): Promise<number[]> => {
+  if (config.embedding.provider !== "openai") return lexicalEmbedding(text);
+  try {
+    return await openAiEmbedding({
+      text,
+      apiKey: config.embedding.openaiApiKey,
+      model: config.embedding.model,
+      baseUrl: config.embedding.baseUrl,
+    });
+  } catch (error) {
+    logger.warn(`[experience-replay] OpenAI embeddings failed, falling back to lexical: ${String(error)}`);
+    return lexicalEmbedding(text);
+  }
+};
+
+const rankExperience = (query: number[], experience: StoredExperience): RetrievedExperience => ({
+  ...experience,
+  score: cosineSimilarity(query, experience.vector),
+});
+
+const byScoreThenRecency = (left: RetrievedExperience, right: RetrievedExperience): number =>
+  right.score - left.score || right.createdAt.localeCompare(left.createdAt);
+
+export const retrieveExperiences = async (input: {
+  prompt: string;
+  config: ExperienceReplayConfig;
+  experiences: StoredExperience[];
+  embed: Embedder;
+}): Promise<RetrievedExperience[]> => {
+  const queryVector = await input.embed(input.prompt);
+  return input.experiences
+    .map((experience) => rankExperience(queryVector, experience))
+    .filter(({ score }) => score >= input.config.similarityThreshold)
+    .sort(byScoreThenRecency)
+    .slice(0, Math.min(input.config.topK, input.config.maxExamples));
+};

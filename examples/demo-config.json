@@ -1,0 +1,21 @@
+{
+  "plugins": {
+    "entries": {
+      "experience-replay": {
+        "enabled": true,
+        "config": {
+          "storePath": "~/.openclaw/experience-replay.db",
+          "topK": 3,
+          "maxCandidates": 250,
+          "similarityThreshold": 0.35,
+          "embedding": {
+            "provider": "lexical"
+          }
+        }
+      }
+    },
+    "load": {
+      "paths": ["./openclaw-experience-replay"]
+    }
+  }
+}

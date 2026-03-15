@@ -1,0 +1,140 @@
+{
+  "id": "experience-replay",
+  "name": "Experience Replay",
+  "version": "0.1.0",
+  "description": "Records successful task trajectories and replays similar experiences before future runs.",
+  "entry": "./src/index.ts",
+  "uiHints": {
+    "storePath": {
+      "label": "Store Path",
+      "advanced": true
+    },
+    "topK": {
+      "label": "Top K"
+    },
+    "maxCandidates": {
+      "label": "Candidate Window",
+      "advanced": true
+    },
+    "similarityThreshold": {
+      "label": "Similarity Threshold"
+    },
+    "embedding.provider": {
+      "label": "Embedding Provider"
+    },
+    "embedding.model": {
+      "label": "Embedding Model",
+      "advanced": true
+    },
+    "embedding.openaiApiKey": {
+      "label": "OpenAI API Key",
+      "sensitive": true,
+      "advanced": true
+    },
+    "success.minScore": {
+      "label": "Success Score Threshold",
+      "advanced": true
+    },
+    "capture.maxToolCalls": {
+      "label": "Max Tool Calls",
+      "advanced": true
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "default": true
+      },
+      "storePath": {
+        "type": "string",
+        "default": "~/.openclaw/experience-replay.db"
+      },
+      "topK": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 10,
+        "default": 3
+      },
+      "similarityThreshold": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1,
+        "default": 0.32
+      },
+      "maxExamples": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 8,
+        "default": 3
+      },
+      "maxCandidates": {
+        "type": "integer",
+        "minimum": 10,
+        "maximum": 5000,
+        "default": 250
+      },
+      "embedding": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": ["lexical", "openai"],
+            "default": "lexical"
+          },
+          "model": {
+            "type": "string",
+            "default": "text-embedding-3-small"
+          },
+          "openaiApiKey": {
+            "type": "string"
+          },
+          "baseUrl": {
+            "type": "string",
+            "default": "https://api.openai.com/v1"
+          }
+        }
+      },
+      "capture": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maxToolCalls": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 8
+          },
+          "maxCharsPerResult": {
+            "type": "integer",
+            "minimum": 40,
+            "maximum": 2000,
+            "default": 280
+          }
+        }
+      },
+      "success": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "minScore": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0.65
+          },
+          "negativeFeedbackPatterns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": ["不对", "重来", "错了", "失败", "that is wrong", "try again", "redo"]
+          }
+        }
+      }
+    }
+  }
+}
