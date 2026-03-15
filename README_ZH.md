@@ -1,5 +1,7 @@
 # openclaw-experience-replay
 
+![Demo](https://github.com/user-attachments/assets/95847fce-5c2e-4a76-bee1-d62ac3fcaa4a)
+
 给 OpenClaw 用的经验回放插件：记录成功任务轨迹，在下一次相似任务开始前召回并注入少量成功案例，帮助 Agent 从过去的成功中获取参考——无需微调，本地运行。
 
 ## 特性

@@ -1,5 +1,7 @@
 # openclaw-experience-replay
 
+![Demo](https://github.com/user-attachments/assets/95847fce-5c2e-4a76-bee1-d62ac3fcaa4a)
+
 Contextual experience replay plugin for OpenClaw. It stores successful task trajectories, retrieves similar past wins before a run, and injects them as concise in-context guidance — no fine-tuning required.
 
 ## Features
