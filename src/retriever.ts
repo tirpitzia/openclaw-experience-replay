@@ -54,25 +54,76 @@ const openAiEmbedding = async (input: {
   return payload.data?.[0]?.embedding ?? zeroVector(128);
 };
 
-export const createEmbedder = (config: ExperienceReplayConfig, logger: PluginLogger) => async (text: string): Promise<number[]> => {
-  if (config.embedding.provider !== "openai") return lexicalEmbedding(text);
-  try {
-    return await openAiEmbedding({
-      text,
-      apiKey: config.embedding.openaiApiKey,
-      model: config.embedding.model,
-      baseUrl: config.embedding.baseUrl,
-    });
-  } catch (error) {
-    logger.warn(`[experience-replay] OpenAI embeddings failed, falling back to lexical: ${String(error)}`);
-    return lexicalEmbedding(text);
-  }
+const ollamaEmbedding = async (input: {
+  text: string;
+  model: string;
+  baseUrl: string;
+}): Promise<number[]> => {
+  const response = await fetch(`${input.baseUrl}/api/embed`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ model: input.model, input: input.text }),
+  });
+  const payload = (await response.json()) as { embeddings?: number[][]; error?: string };
+  if (!response.ok) throw new Error(payload.error ?? `ollama embedding request failed: ${response.status}`);
+  return payload.embeddings?.[0] ?? zeroVector(128);
 };
 
-const rankExperience = (query: number[], experience: StoredExperience): RetrievedExperience => ({
-  ...experience,
-  score: cosineSimilarity(query, experience.vector),
-});
+export const createEmbedder = (config: ExperienceReplayConfig, logger: PluginLogger) => async (text: string): Promise<number[]> => {
+  if (config.embedding.provider === "openai") {
+    try {
+      return await openAiEmbedding({
+        text,
+        apiKey: config.embedding.openaiApiKey,
+        model: config.embedding.model,
+        baseUrl: config.embedding.baseUrl,
+      });
+    } catch (error) {
+      logger.warn(`[experience-replay] OpenAI embeddings failed, falling back to lexical: ${String(error)}`);
+      return lexicalEmbedding(text);
+    }
+  }
+  if (config.embedding.provider === "ollama") {
+    try {
+      return await ollamaEmbedding({
+        text,
+        model: config.embedding.ollamaModel,
+        baseUrl: config.embedding.ollamaBaseUrl,
+      });
+    } catch (error) {
+      logger.warn(`[experience-replay] Ollama embeddings failed, falling back to lexical: ${String(error)}`);
+      return lexicalEmbedding(text);
+    }
+  }
+  return lexicalEmbedding(text);
+};
+
+/**
+ * Rank an experience against the current query using hybrid scoring.
+ *
+ * When provider is "openai" or "ollama" (neural), the final score is a weighted
+ * blend of the neural similarity (stored embedding vs. query embedding) and the
+ * lexical similarity (computed on-the-fly from stored prompt text). This improves
+ * recall for queries that are semantically similar but use different keywords.
+ *
+ * hybridWeight = 1.0 → pure neural
+ * hybridWeight = 0.0 → pure lexical
+ * hybridWeight = 0.7 → default: 70% neural + 30% lexical
+ */
+const rankExperience = (input: {
+  queryVector: number[];
+  queryLexical: number[];
+  experience: StoredExperience;
+  hybridWeight: number;
+  useHybrid: boolean;
+}): RetrievedExperience => {
+  const neuralScore = cosineSimilarity(input.queryVector, input.experience.vector);
+  if (!input.useHybrid) return { ...input.experience, score: neuralScore };
+  const storedLexical = lexicalEmbedding(input.experience.prompt);
+  const lexicalScore = cosineSimilarity(input.queryLexical, storedLexical);
+  const combined = input.hybridWeight * neuralScore + (1 - input.hybridWeight) * lexicalScore;
+  return { ...input.experience, score: combined };
+};
 
 const byScoreThenRecency = (left: RetrievedExperience, right: RetrievedExperience): number =>
   right.score - left.score || right.createdAt.localeCompare(left.createdAt);
@@ -84,9 +135,19 @@ export const retrieveExperiences = async (input: {
   embed: Embedder;
 }): Promise<RetrievedExperience[]> => {
   const queryVector = await input.embed(input.prompt);
+  const useHybrid = input.config.embedding.provider !== "lexical" && input.config.embedding.hybridWeight < 1;
+  const queryLexical = useHybrid ? lexicalEmbedding(input.prompt) : queryVector;
   return input.experiences
-    .map((experience) => rankExperience(queryVector, experience))
+    .map((experience) =>
+      rankExperience({
+        queryVector,
+        queryLexical,
+        experience,
+        hybridWeight: input.config.embedding.hybridWeight,
+        useHybrid,
+      }),
+    )
     .filter(({ score }) => score >= input.config.similarityThreshold)
     .sort(byScoreThenRecency)
-    .slice(0, Math.min(input.config.topK, input.config.maxExamples));
+    .slice(0, input.config.maxExamples);
 };

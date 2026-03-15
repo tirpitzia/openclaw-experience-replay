@@ -6,6 +6,9 @@
   "keywords": ["openclaw-plugin", "openclaw", "experience-replay", "agent-memory"],
   "license": "MIT",
   "files": ["src", "examples", "openclaw.plugin.json", "README.md", "README_ZH.md", "LICENSE"],
+  "bin": {
+    "experience-replay": "./src/cli.ts"
+  },
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

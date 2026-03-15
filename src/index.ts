@@ -52,7 +52,7 @@ export const register = (api: OpenClawPluginApi): void => {
       ? { prependSystemContext: EXPERIENCE_REPLAY_SYSTEM_CONTEXT }
       : {
           prependSystemContext: EXPERIENCE_REPLAY_SYSTEM_CONTEXT,
-          prependContext: formatExperienceReplay(experiences),
+          prependContext: formatExperienceReplay(experiences, config.language),
         };
   });
 

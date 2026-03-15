@@ -68,6 +68,8 @@ export const createExperienceStore = (params: { dbPath: string; logger: PluginLo
   `);
   const selectRecent = db.prepare<[number], ExperienceRow>("SELECT * FROM experiences ORDER BY created_at DESC LIMIT ?");
   const selectCount = db.prepare<[], { total: number }>("SELECT COUNT(*) AS total FROM experiences");
+  const deleteById = db.prepare<[string], void>("DELETE FROM experiences WHERE id = ?");
+  const deleteAllStmt = db.prepare<[], void>("DELETE FROM experiences");
   return {
     save(experience: StoredExperience): boolean {
       const result = insert.run(serializeExperience(experience));
@@ -79,6 +81,14 @@ export const createExperienceStore = (params: { dbPath: string; logger: PluginLo
     },
     count(): number {
       return selectCount.get()?.total ?? 0;
+    },
+    delete(id: string): boolean {
+      const result = deleteById.run(id);
+      return result.changes > 0;
+    },
+    deleteAll(): number {
+      const result = deleteAllStmt.run();
+      return result.changes;
     },
   };
 };

@@ -5,16 +5,19 @@ import type { ExperienceReplayConfig, RunTrace } from "./types.js";
 const config: ExperienceReplayConfig = {
   enabled: true,
   storePath: "/tmp/experience-replay.db",
-  topK: 3,
-  similarityThreshold: 0.3,
   maxExamples: 3,
+  similarityThreshold: 0.3,
   maxCandidates: 10,
+  language: "zh",
   embedding: {
     provider: "lexical",
     requestedProvider: "lexical",
     model: "text-embedding-3-small",
     openaiApiKey: "",
     baseUrl: "https://api.openai.com/v1",
+    ollamaBaseUrl: "http://localhost:11434",
+    ollamaModel: "nomic-embed-text",
+    hybridWeight: 0.7,
   },
   capture: {
     maxToolCalls: 8,
@@ -23,6 +26,13 @@ const config: ExperienceReplayConfig = {
   success: {
     minScore: 0.65,
     negativeFeedbackPatterns: ["不对", "redo"],
+    scoreWeights: {
+      success: 0.55,
+      finalAnswer: 0.20,
+      toolUse: 0.15,
+      directAnswer: 0.10,
+      noNegativeFeedback: 0.15,
+    },
   },
 };
 
@@ -36,6 +46,37 @@ describe("recorder", () => {
       config,
     });
     expect(score).toBeGreaterThan(config.success.minScore);
+  });
+
+  it("uses directAnswer weight instead of toolUse when no tool calls", () => {
+    const withTools = scoreExperience({
+      success: true,
+      prompt: "帮我预订会议室",
+      finalAnswer: "已预订。",
+      toolCalls: [createToolCallTrace({ toolName: "calendar", params: {}, result: { ok: true }, maxCharsPerResult: 40 })],
+      config,
+    });
+    const withoutTools = scoreExperience({
+      success: true,
+      prompt: "帮我预订会议室",
+      finalAnswer: "已预订。",
+      toolCalls: [],
+      config,
+    });
+    expect(withTools).toBeGreaterThan(withoutTools);
+    // directAnswer (0.10) < toolUse (0.15)
+    expect(withTools - withoutTools).toBeCloseTo(config.success.scoreWeights.toolUse - config.success.scoreWeights.directAnswer);
+  });
+
+  it("respects custom score weights", () => {
+    const heavySuccess = scoreExperience({
+      success: true,
+      prompt: "任务",
+      finalAnswer: "完成。",
+      toolCalls: [],
+      config: { ...config, success: { ...config.success, scoreWeights: { ...config.success.scoreWeights, success: 0.9 } } },
+    });
+    expect(heavySuccess).toBeGreaterThan(0.9);
   });
 
   it("builds an experience record from run traces", () => {

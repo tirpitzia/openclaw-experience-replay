@@ -85,13 +85,15 @@ export const scoreExperience = (input: {
   finalAnswer: string;
   toolCalls: ToolCallTrace[];
   config: ExperienceReplayConfig;
-}): number =>
-  [
-    input.success ? 0.55 : 0,
-    input.finalAnswer && !looksLikeFailureResponse(input.finalAnswer) ? 0.2 : 0,
-    input.toolCalls.length > 0 ? 0.15 : 0.1,
-    includesNegativeFeedback(input.prompt, input.config.success.negativeFeedbackPatterns) ? 0 : 0.15,
+}): number => {
+  const w = input.config.success.scoreWeights;
+  return [
+    input.success ? w.success : 0,
+    input.finalAnswer && !looksLikeFailureResponse(input.finalAnswer) ? w.finalAnswer : 0,
+    input.toolCalls.length > 0 ? w.toolUse : w.directAnswer,
+    includesNegativeFeedback(input.prompt, input.config.success.negativeFeedbackPatterns) ? 0 : w.noNegativeFeedback,
   ].reduce((sum, value) => sum + value, 0);
+};
 
 const buildTrajectory = (prompt: string, toolCalls: ToolCallTrace[], finalAnswer: string): ExperienceTrajectory => ({
   prompt,

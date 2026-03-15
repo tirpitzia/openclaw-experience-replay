@@ -5,16 +5,19 @@ import type { ExperienceReplayConfig, StoredExperience } from "./types.js";
 const config: ExperienceReplayConfig = {
   enabled: true,
   storePath: "/tmp/experience-replay.db",
-  topK: 2,
-  similarityThreshold: 0.2,
   maxExamples: 2,
+  similarityThreshold: 0.2,
   maxCandidates: 10,
+  language: "zh",
   embedding: {
     provider: "lexical",
     requestedProvider: "lexical",
     model: "text-embedding-3-small",
     openaiApiKey: "",
     baseUrl: "https://api.openai.com/v1",
+    ollamaBaseUrl: "http://localhost:11434",
+    ollamaModel: "nomic-embed-text",
+    hybridWeight: 0.7,
   },
   capture: {
     maxToolCalls: 8,
@@ -23,6 +26,13 @@ const config: ExperienceReplayConfig = {
   success: {
     minScore: 0.65,
     negativeFeedbackPatterns: ["不对"],
+    scoreWeights: {
+      success: 0.55,
+      finalAnswer: 0.20,
+      toolUse: 0.15,
+      directAnswer: 0.10,
+      noNegativeFeedback: 0.15,
+    },
   },
 };
 
@@ -69,13 +79,41 @@ describe("retriever", () => {
   it("prefers newer matches when scores tie", async () => {
     const results = await retrieveExperiences({
       prompt: "帮我预订周五下午的会议室",
-      config: { ...config, similarityThreshold: 0, topK: 2, maxExamples: 2 },
+      config: { ...config, similarityThreshold: 0, maxExamples: 2 },
       experiences: [
-        { ...experiences[0], id: "newer", createdAt: "2026-03-16T00:00:00.000Z" },
-        { ...experiences[0], id: "older", createdAt: "2026-03-13T00:00:00.000Z" },
+        { ...experiences[0]!, id: "newer", createdAt: "2026-03-16T00:00:00.000Z" },
+        { ...experiences[0]!, id: "older", createdAt: "2026-03-13T00:00:00.000Z" },
       ],
       embed: async (text) => lexicalEmbedding(text),
     });
     expect(results.map(({ id }) => id)).toEqual(["newer", "older"]);
+  });
+
+  it("uses maxExamples to cap results", async () => {
+    const manyExperiences = Array.from({ length: 10 }, (_, i) => ({
+      ...experiences[0]!,
+      id: String(i),
+      fingerprint: String(i),
+      createdAt: `2026-03-${String(i + 1).padStart(2, "0")}T00:00:00.000Z`,
+    }));
+    const results = await retrieveExperiences({
+      prompt: "帮我预订周五下午的会议室",
+      config: { ...config, similarityThreshold: 0, maxExamples: 3 },
+      experiences: manyExperiences,
+      embed: async (text) => lexicalEmbedding(text),
+    });
+    expect(results).toHaveLength(3);
+  });
+
+  it("uses pure lexical score when provider is lexical (no hybrid blend)", async () => {
+    // With lexical provider, hybridWeight is ignored and score = cosine(queryLexical, storedVector)
+    const lexicalConfig = { ...config, embedding: { ...config.embedding, provider: "lexical" as const } };
+    const results = await retrieveExperiences({
+      prompt: "帮我预订周五下午的会议室",
+      config: lexicalConfig,
+      experiences: experiences.slice(0, 1),
+      embed: async (text) => lexicalEmbedding(text),
+    });
+    expect(results[0]?.score).toBeGreaterThan(0.5);
   });
 });
