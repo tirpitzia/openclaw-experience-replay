@@ -100,7 +100,7 @@ const cmdDelete = (db: Database.Database, id: string): void => {
     process.exit(1);
   }
   // Support prefix match (first 8 chars)
-  const fullRow = db.prepare<[string], { id: string }>(
+  const fullRow = db.prepare<[string, string], { id: string }>(
     "SELECT id FROM experiences WHERE id = ? OR id LIKE ?",
   ).get(id, `${id}%`);
   if (!fullRow) {

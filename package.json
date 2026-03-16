@@ -1,20 +1,41 @@
 {
   "name": "experience-replay",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "OpenClaw plugin for contextual experience replay and self-improvement.",
   "type": "module",
-  "keywords": ["openclaw-plugin", "openclaw", "experience-replay", "agent-memory"],
+  "main": "./dist/index.js",
+  "keywords": [
+    "openclaw-plugin",
+    "openclaw",
+    "experience-replay",
+    "agent-memory"
+  ],
   "license": "MIT",
-  "files": ["src", "examples", "openclaw.plugin.json", "README.md", "README_ZH.md", "LICENSE"],
+  "files": [
+    "dist",
+    "examples",
+    "openclaw.plugin.json",
+    "README.md",
+    "README_ZH.md",
+    "LICENSE"
+  ],
   "bin": {
-    "experience-replay": "./src/cli.ts"
+    "experience-replay": "dist/cli.js"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "npm run build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
+  },
   "openclaw": {
-    "extensions": ["./src/index.ts"]
+    "extensions": [
+      "./dist/index.js"
+    ]
   },
   "peerDependencies": {
     "openclaw": ">=2026.3.13"
