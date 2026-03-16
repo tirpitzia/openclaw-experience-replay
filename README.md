@@ -4,6 +4,38 @@
 
 Contextual experience replay plugin for OpenClaw. It stores successful task trajectories, retrieves similar past wins before a run, and injects them as concise in-context guidance — no fine-tuning required.
 
+## Quick Start
+
+Install from npm:
+
+```bash
+openclaw plugins install experience-replay
+```
+
+Then enable and configure it in your `openclaw.json`:
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "experience-replay": {
+        "enabled": true,
+        "config": {
+          "storePath": "~/.openclaw/experience-replay.db",
+          "maxExamples": 3
+        }
+      }
+    }
+  }
+}
+```
+
+For local development, you can link the current checkout instead:
+
+```bash
+openclaw plugins install -l ./openclaw-experience-replay
+```
+
 ## Features
 
 - SQLite-backed local memory with no training step
@@ -25,25 +57,6 @@ Contextual experience replay plugin for OpenClaw. It stores successful task traj
 2. The plugin injects a short `<experience_replay>` block ahead of the prompt.
 3. `after_tool_call` and `llm_output` accumulate the run trace.
 4. `agent_end` scores the run and stores only high-quality, non-failure trajectories.
-
-## Install
-
-```bash
-npm install
-```
-
-Then load the plugin from your `openclaw.json`:
-
-```json
-{
-  "plugins": {
-    "entries": {
-      "experience-replay": { "enabled": true }
-    },
-    "load": { "paths": ["./openclaw-experience-replay"] }
-  }
-}
-```
 
 ## Config
 

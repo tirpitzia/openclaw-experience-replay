@@ -4,6 +4,38 @@
 
 给 OpenClaw 用的经验回放插件：记录成功任务轨迹，在下一次相似任务开始前召回并注入少量成功案例，帮助 Agent 从过去的成功中获取参考——无需微调，本地运行。
 
+## 快速开始
+
+先直接从 npm 安装：
+
+```bash
+openclaw plugins install experience-replay
+```
+
+然后在 `openclaw.json` 里启用并配置：
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "experience-replay": {
+        "enabled": true,
+        "config": {
+          "storePath": "~/.openclaw/experience-replay.db",
+          "maxExamples": 3
+        }
+      }
+    }
+  }
+}
+```
+
+如果你是在本地开发这个插件，也可以直接 link 当前目录：
+
+```bash
+openclaw plugins install -l ./openclaw-experience-replay
+```
+
 ## 特性
 
 - 本地 SQLite 存储，无需任何训练步骤
@@ -25,21 +57,6 @@
 2. 插件把经验压缩成 `<experience_replay>` 上下文注入到 prompt 前。
 3. `after_tool_call` 和 `llm_output` 持续记录本轮轨迹。
 4. `agent_end` 对本轮打分，只把高质量、非失败轨迹写入经验库。
-
-## 启用方式
-
-在 `openclaw.json` 中加载本插件：
-
-```json
-{
-  "plugins": {
-    "entries": {
-      "experience-replay": { "enabled": true }
-    },
-    "load": { "paths": ["./openclaw-experience-replay"] }
-  }
-}
-```
 
 ## 配置说明
 
